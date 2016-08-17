@@ -38,15 +38,15 @@ namespace VSTS
 		/// <returns></returns>
 		public Task Initialize(string branchName)
 		{
-			return GetBuilds(branchName, 100);
+			return _getBuildsFromServer(branchName, 100);
 		}
 
 		public Task Initialize(string requestedFor, string branchName)
 		{
-			return GetBuilds(requestedFor, branchName, 100);
+			return _getBuildsFromServer(requestedFor, branchName, 100);
 		}
 
-		public async Task<List<WebApi.Build>> GetBuilds(string branchName, int? top = default(int?))
+		private async Task<List<WebApi.Build>> _getBuildsFromServer(string branchName, int? top = default(int?))
 		{
 			using (var client = await _getBuildHttpClient())
 			{
@@ -56,13 +56,18 @@ namespace VSTS
 						top        : top
 					);
 
+                foreach(var build in builds.Where(o => string.IsNullOrEmpty(o.SourceBranch)))
+                {
+                    build.SourceBranch = branchName;
+                }
+
 				_updateBuildCache(builds);
 
 				return builds;
 			}
 		}
 
-		public async Task<List<WebApi.Build>> GetBuilds(string requestedFor, string branchName, int? top = default(int?))
+		private async Task<List<WebApi.Build>> _getBuildsFromServer(string requestedFor, string branchName, int? top = default(int?))
 		{
 			using (var client = await _getBuildHttpClient())
 			{
@@ -72,6 +77,11 @@ namespace VSTS
 						branchName   : branchName,
 						top          : top
 					);
+
+                foreach(var build in builds.Where(o => string.IsNullOrEmpty(o.SourceBranch)))
+                {
+                    build.SourceBranch = branchName;
+                }
 
 				_updateBuildCache(builds);
 
@@ -93,16 +103,12 @@ namespace VSTS
 			{
 				if (existing != mappedBuild)
 				{
-					// Clone the existing build for event notification
-					var oldBuild = new Contract.Build();
-					Helpers.CloneObject(existing, oldBuild);
-
-					// Replace the build in the list
-					Helpers.CloneObject(mappedBuild, existing);
+                    // Clone the existing build for event notification
+					_queriedBuilds[id] = mappedBuild;
 
 					// Notify of the change
 					OnBuildChanged(new BuildChangedEventArgs(
-						oldBuild,
+						existing,
                         mappedBuild
                     ));
 				}
@@ -120,7 +126,7 @@ namespace VSTS
 		{
 			Func<Task<List<WebApi.Build>>, Task<WebApi.Build>> continuationTask = async (t) => (await t).First();
 
-			return GetBuilds(requestedFor, branchName, 1)
+			return _getBuildsFromServer(requestedFor, branchName, 1)
 				.ContinueWith(continuationTask)
 				.Unwrap();
 		}
@@ -153,12 +159,24 @@ namespace VSTS
 					   && (string.IsNullOrEmpty(requestedFor) || build.RequestedFor == requestedFor)
 					   && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
 				   select build;
-			//select new Contract.BuildState
-			//{
-			//    Id     = build.Id,
-			//    Status = (Contract.BuildStatus?)build.Status,
-			//    Result = (Contract.BuildResult?)build.Result
-			//};
+		}
+
+		private IEnumerable<Contract.Build> _getBuilds(string requestedFor, string branchName)
+		{
+			return from kvp in _queriedBuilds
+				   let build = kvp.Value
+				   where
+					   build.Status.HasValue
+					   && (string.IsNullOrEmpty(requestedFor) || build.RequestedFor == requestedFor)
+					   && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
+				   select build;
+		}
+
+		public async Task<IEnumerable<Contract.Build>> GetBuilds(string branchName)
+		{
+			await Initialize(branchName);
+
+			return _getBuilds(null, branchName);
 		}
 
 		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string branchName)
