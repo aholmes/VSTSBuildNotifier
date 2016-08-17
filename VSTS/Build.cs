@@ -9,6 +9,9 @@ using AutoMapper;
 
 namespace VSTS
 {
+	/// <summary>
+	/// Utility class for querying builds through VSTS.
+	/// </summary>
 	public class Build : INotifyBuildChanged
 	{
 		private Uri _vstsUri;
@@ -16,6 +19,12 @@ namespace VSTS
 
 		private ObservableConcurrentDictionary<int, Contract.Build> _queriedBuilds = new ObservableConcurrentDictionary<int, Contract.Build>();
 
+		/// <summary>
+		/// Obtain new instance.
+		/// </summary>
+		/// <param name="vstsUri"></param>
+		/// <param name="collectionName"></param>
+		/// <param name="projectName"></param>
 		public Build(string vstsUri, string collectionName, string projectName)
 		{
 			Configuration.AutoMapperConfiguration.Initialize();
@@ -37,6 +46,13 @@ namespace VSTS
 			return _getBuildsFromServer(requestedFor, branchName, 100);
 		}
 
+		/// <summary>
+		/// Query VSTS for builds.
+		/// </summary>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <param name="top"></param>
+		/// <returns></returns>
 		private async Task<List<WebApi.Build>> _getBuildsFromServer(string requestedFor = default(string), string branchName = default(string), int? top = default(int?))
 		{
 			using (var client = await _getBuildHttpClient())
@@ -59,12 +75,21 @@ namespace VSTS
 			}
 		}
 
+		/// <summary>
+		/// Obtain a new HTTP client to query VSTS.
+		/// </summary>
+		/// <returns></returns>
 		private Task<BuildHttpClient> _getBuildHttpClient()
 		{
 			var connection = new VssConnection(_vstsUri, new VssAadCredential());
 			return connection.GetClientAsync<BuildHttpClient>();
 		}
 
+		/// <summary>
+		/// Updates the local build cache with a single build and signals build changes when there are any.
+		/// </summary>
+		/// <param name="build"></param>
+		/// <returns></returns>
 		private Contract.Build _updateBuildCache(WebApi.Build build)
 		{
 			var mappedBuild = Mapper.Map<Contract.Build>(build);
@@ -87,38 +112,22 @@ namespace VSTS
 			});
 		}
 
+		/// <summary>
+		/// Updates the build cache with multiple builds.
+		/// </summary>
+		/// <param name="builds"></param>
 		private void _updateBuildCache(List<WebApi.Build> builds)
 		{
 			builds.ForEach(build => _updateBuildCache(build));
 		}
 
-		public Task<WebApi.Build> GetLastBuild(string requestedFor, string branchName)
-		{
-			Func<Task<List<WebApi.Build>>, Task<WebApi.Build>> continuationTask = async (t) => (await t).First();
-
-			return _getBuildsFromServer(requestedFor, branchName, 1)
-				.ContinueWith(continuationTask)
-				.Unwrap();
-		}
-
-		public Task<Contract.BuildStatus?> GetLastBuildStatus(string requestedFor, string branchName)
-		{
-			Func<Task<WebApi.Build>, Task<Contract.BuildStatus?>> continuationTask = async (t) => (Contract.BuildStatus?)((await t).Status);
-
-			return GetLastBuild(requestedFor, branchName)
-				.ContinueWith(continuationTask)
-				.Unwrap();
-		}
-
-		public Task<Contract.BuildResult?> GetLastBuildResult(string requestedFor, string branchName)
-		{
-			Func<Task<WebApi.Build>, Task<Contract.BuildResult?>> continuationTask = async (t) => (Contract.BuildResult?)((await t).Result);
-
-			return GetLastBuild(requestedFor, branchName)
-				.ContinueWith(continuationTask)
-				.Unwrap();
-		}
-
+		/// <summary>
+		/// Retrieve pending builds from the `builds` enumerable, optionally filtered by `requestedFor` and `branchName`.
+		/// </summary>
+		/// <param name="builds"></param>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
 		private static IEnumerable<Contract.Build> _getPendingBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
 		{
 			builds = builds.Where(build =>
@@ -129,6 +138,13 @@ namespace VSTS
 			return _getBuilds(builds, requestedFor, branchName);
 		}
 
+		/// <summary>
+		/// Retrieve builds from the `builds` enumerable, optionally filtered by `requestedFor` and `branchName`.
+		/// </summary>
+		/// <param name="builds"></param>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
 		private static IEnumerable<Contract.Build> _getBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
 		{
 			if (!string.IsNullOrEmpty(requestedFor))
@@ -144,6 +160,12 @@ namespace VSTS
 			return builds;
 		}
 
+		/// <summary>
+		/// Retrieve builds from VSTS, optionally filtered by `requestedFor` and `branchName`.
+		/// </summary>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
 		public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
 		{
 			await Initialize(requestedFor, branchName);
@@ -151,27 +173,24 @@ namespace VSTS
 			return _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
 		}
 
-		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor, string branchName)
+		/// <summary>
+		/// Retrieve pending builds from VSTS, filtered by `requestedFor` and `branchName`.
+		/// </summary>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
+		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor = default(string), string branchName = default(string))
 		{
 			await Initialize(requestedFor, branchName);
 
 			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
 		}
 
-		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string branchName)
-		{
-			await Initialize(branchName);
-
-			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), branchName);
-		}
-
-		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds()
-		{
-			await Initialize();
-
-			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value));
-		}
-
+		/// <summary>
+		/// Retrieve a single build from VSTS.
+		/// </summary>
+		/// <param name="buildId"></param>
+		/// <returns></returns>
 		public async Task<Contract.Build> GetBuild(int buildId)
 		{
 			using (var client = await _getBuildHttpClient())
@@ -184,8 +203,15 @@ namespace VSTS
 			}
 		}
 
+		/// <summary>
+		/// Triggers when a previously tracked build changes in any way.
+		/// </summary>
 		public event BuildChangedEventHandler BuildChanged;
 
+		/// <summary>
+		/// Trigger BuildChanged.
+		/// </summary>
+		/// <param name="e"></param>
 		private void OnBuildChanged(BuildChangedEventArgs e)
 		{
 			var handler = BuildChanged;

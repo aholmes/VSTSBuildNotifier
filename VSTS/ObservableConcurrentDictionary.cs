@@ -5,6 +5,11 @@ using System.Collections.Specialized;
 
 namespace VSTS
 {
+	/// <summary>
+	/// https://code.msdn.microsoft.com/windowsdesktop/Samples-for-Parallel-b4b76364/sourcecode?fileId=44488&pathId=197768125
+	/// </summary>
+	/// <typeparam name="TKey"></typeparam>
+	/// <typeparam name="TValue"></typeparam>
 	public sealed class ObservableConcurrentDictionary<TKey, TValue> : ConcurrentDictionary<TKey, TValue>, INotifyCollectionChanged
 	{
 		public ObservableConcurrentDictionary()

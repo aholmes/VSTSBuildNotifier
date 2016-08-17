@@ -2,9 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using VSTS.Contract;
 
@@ -41,10 +38,15 @@ namespace Notifier
 		private static string _twilioFromNumber;
 		private static string _twilioToNumber;
 
-
+		/// <summary>
+		/// Periodically queries for builds and monitors changes to those builds.
+		/// </summary>
+		/// <returns></returns>
 		static async Task Exec()
 		{
 			var buildService = new VSTS.Build(_VSTSUri, _VSTSCollection, _VSTSProject);
+
+			// When a build is changed, show the old and new status and result, then send a text message.
 			buildService.BuildChanged += (sender, args) =>
 			{
 				Console.WriteLine("Done - old: " + args.OldBuild.Id + ": " + args.OldBuild.Status + " " + args.OldBuild.Result);
@@ -57,6 +59,7 @@ namespace Notifier
 				SendTwilioMessage(message);
 			};
 
+			// Based on the configuration from App.config, set the function to call to query builds.
 			System.Func<Task<IEnumerable<Build>>> getBuilds;
 			if (!string.IsNullOrEmpty(_VSTSBuildRequestedByUserName))
 			{
@@ -72,12 +75,16 @@ namespace Notifier
 			}
 
 			Console.WriteLine("Running ...");
+			// Loop forever unless an exception occurs.
 			while (true)
 			{
 				Console.WriteLine("\n" + DateTime.Now);
 
+				// Although there is a method to retrieve just the pending builds,
+				// we need to get all the builds in order to compare their status when they finish.
 				var builds = await getBuilds();
 
+				// Show which builds are being monitored.
 				var pendingBuilds = builds.Where(build => (build.Status.Value & (BuildStatus.InProgress | BuildStatus.Cancelling | BuildStatus.Postponed | BuildStatus.NotStarted)) != BuildStatus.None);
 				foreach (var build in pendingBuilds)
 				{
@@ -88,6 +95,11 @@ namespace Notifier
 			}
 		}
 
+		/// <summary>
+		/// Send a text message.
+		/// </summary>
+		/// <param name="message"></param>
+		/// <returns></returns>
 		static Task SendTwilioMessage(string message)
 		{
 			var twilio = new Twilio.Sender(_twilioAccountSid, _twilioAuthToken);

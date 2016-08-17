@@ -2,6 +2,9 @@
 
 namespace VSTS.Contract
 {
+	/// <summary>
+	/// Mirrors WebApi.BuildStatus.
+	/// </summary>
 	[Flags]
 	public enum BuildStatus
 	{

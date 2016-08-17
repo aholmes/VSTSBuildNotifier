@@ -4,6 +4,11 @@ using System.Runtime.Serialization;
 
 namespace VSTS.Contract
 {
+	/// <summary>
+	/// Closely mirrors WebApi.Build for the purposes of not requiring that
+	/// projects using this project also pull in the TeamFoundation Nuget packages.
+	/// Also lends itself to flexibility for build comparisons.
+	/// </summary>
 	public struct Build
 	{
 		//
