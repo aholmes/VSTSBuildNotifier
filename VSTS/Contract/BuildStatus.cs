@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace VSTS.Contract
 {
@@ -30,9 +26,9 @@ namespace VSTS.Contract
 		// Summary:
 		//     The build has not yet started.
 		NotStarted = 1 << 5, // 5 is intentional
-		//
-		// Summary:
-		//     All status.
-		All = InProgress|Completed|Cancelling|Postponed|NotStarted
+							 //
+							 // Summary:
+							 //     All status.
+		All = InProgress | Completed | Cancelling | Postponed | NotStarted
 	}
 }

@@ -1,200 +1,196 @@
 ﻿using System;
-using System.Reflection;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using Microsoft.TeamFoundation.Build.WebApi;
 using WebApi = Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.VisualStudio.Services.Client;
-using System.ComponentModel;
-using System.Threading;
 using AutoMapper;
 
 namespace VSTS
 {
-    public class Build : INotifyBuildChanged
-    {
-        private Uri _vstsUri;
-        private string _projectName;
+	public class Build : INotifyBuildChanged
+	{
+		private Uri _vstsUri;
+		private string _projectName;
 
-        private ObservableConcurrentDictionary<int, Contract.Build> _queriedBuilds = new ObservableConcurrentDictionary<int, Contract.Build>();
+		private ObservableConcurrentDictionary<int, Contract.Build> _queriedBuilds = new ObservableConcurrentDictionary<int, Contract.Build>();
 
-        public Build(string vstsUri, string collectionName, string projectName)
-        {
-            Configuration.AutoMapperConfiguration.Initialize();
+		public Build(string vstsUri, string collectionName, string projectName)
+		{
+			Configuration.AutoMapperConfiguration.Initialize();
 
-            var uriBuilder = new UriBuilder(vstsUri);
-            uriBuilder.Path = string.Concat(uriBuilder.Path.TrimEnd('/'), '/', collectionName);
-            _vstsUri = uriBuilder.Uri;
-            _projectName = projectName;
-        }
+			var uriBuilder  = new UriBuilder(vstsUri);
+			uriBuilder.Path = string.Concat(uriBuilder.Path.TrimEnd('/'), '/', collectionName);
+			_vstsUri        = uriBuilder.Uri;
+			_projectName    = projectName;
+		}
 
-        /// <summary>
-        /// Initialize this class by storing the last 100 builds
-        /// </summary>
-        /// <param name="requestedFor"></param>
-        /// <param name="branchName"></param>
-        /// <returns></returns>
-        public Task Initialize(string requestedFor = default(string), string branchName = default(string))
-        {
-            return _getBuildsFromServer(requestedFor, branchName, 100);
-        }
+		/// <summary>
+		/// Initialize this class by storing the last 100 builds
+		/// </summary>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
+		public Task Initialize(string requestedFor = default(string), string branchName = default(string))
+		{
+			return _getBuildsFromServer(requestedFor, branchName, 100);
+		}
 
-        private async Task<List<WebApi.Build>> _getBuildsFromServer(string requestedFor = default(string), string branchName = default(string), int? top = default(int?))
-        {
-            using (var client = await _getBuildHttpClient())
-            {
-                var builds = await client.GetBuildsAsync(
-                    project      : _projectName,
-                    requestedFor : requestedFor,
-                    branchName   : branchName,
-                    top          : top
-                );
+		private async Task<List<WebApi.Build>> _getBuildsFromServer(string requestedFor = default(string), string branchName = default(string), int? top = default(int?))
+		{
+			using (var client = await _getBuildHttpClient())
+			{
+				var builds = await client.GetBuildsAsync(
+					project      : _projectName,
+					requestedFor : requestedFor,
+					branchName   : branchName,
+					top          : top
+				);
 
-                foreach (var build in builds.Where(o => string.IsNullOrEmpty(o.SourceBranch)))
-                {
-                    build.SourceBranch = branchName;
-                }
+				foreach (var build in builds.Where(o => string.IsNullOrEmpty(o.SourceBranch)))
+				{
+					build.SourceBranch = branchName;
+				}
 
-                _updateBuildCache(builds);
+				_updateBuildCache(builds);
 
-                return builds;
-            }
-        }
+				return builds;
+			}
+		}
 
-        private Task<BuildHttpClient> _getBuildHttpClient()
-        {
-            var connection = new VssConnection(_vstsUri, new VssAadCredential());
-            return connection.GetClientAsync<BuildHttpClient>();
-        }
+		private Task<BuildHttpClient> _getBuildHttpClient()
+		{
+			var connection = new VssConnection(_vstsUri, new VssAadCredential());
+			return connection.GetClientAsync<BuildHttpClient>();
+		}
 
-        private Contract.Build _updateBuildCache(WebApi.Build build)
-        {
-            var mappedBuild = Mapper.Map<Contract.Build>(build);
+		private Contract.Build _updateBuildCache(WebApi.Build build)
+		{
+			var mappedBuild = Mapper.Map<Contract.Build>(build);
 
-            return _queriedBuilds.AddOrUpdate(mappedBuild.Id, mappedBuild, (id, existing) =>
-            {
-                if (existing != mappedBuild)
-                {
-                    // Clone the existing build for event notification
-                    _queriedBuilds[id] = mappedBuild;
+			return _queriedBuilds.AddOrUpdate(mappedBuild.Id, mappedBuild, (id, existing) =>
+			{
+				if (existing != mappedBuild)
+				{
+					// Clone the existing build for event notification
+					_queriedBuilds[id] = mappedBuild;
 
-                    // Notify of the change
-                    OnBuildChanged(new BuildChangedEventArgs(
-                        existing,
-                        mappedBuild
-                    ));
-                }
+					// Notify of the change
+					OnBuildChanged(new BuildChangedEventArgs(
+						existing,
+						mappedBuild
+					));
+				}
 
-                return existing;
-            });
-        }
+				return existing;
+			});
+		}
 
-        private void _updateBuildCache(List<WebApi.Build> builds)
-        {
-            builds.ForEach(build => _updateBuildCache(build));
-        }
+		private void _updateBuildCache(List<WebApi.Build> builds)
+		{
+			builds.ForEach(build => _updateBuildCache(build));
+		}
 
-        public Task<WebApi.Build> GetLastBuild(string requestedFor, string branchName)
-        {
-            Func<Task<List<WebApi.Build>>, Task<WebApi.Build>> continuationTask = async (t) => (await t).First();
+		public Task<WebApi.Build> GetLastBuild(string requestedFor, string branchName)
+		{
+			Func<Task<List<WebApi.Build>>, Task<WebApi.Build>> continuationTask = async (t) => (await t).First();
 
-            return _getBuildsFromServer(requestedFor, branchName, 1)
-                .ContinueWith(continuationTask)
-                .Unwrap();
-        }
+			return _getBuildsFromServer(requestedFor, branchName, 1)
+				.ContinueWith(continuationTask)
+				.Unwrap();
+		}
 
-        public Task<Contract.BuildStatus?> GetLastBuildStatus(string requestedFor, string branchName)
-        {
-            Func<Task<WebApi.Build>, Task<Contract.BuildStatus?>> continuationTask = async (t) => (Contract.BuildStatus?)((await t).Status);
+		public Task<Contract.BuildStatus?> GetLastBuildStatus(string requestedFor, string branchName)
+		{
+			Func<Task<WebApi.Build>, Task<Contract.BuildStatus?>> continuationTask = async (t) => (Contract.BuildStatus?)((await t).Status);
 
-            return GetLastBuild(requestedFor, branchName)
-                .ContinueWith(continuationTask)
-                .Unwrap();
-        }
+			return GetLastBuild(requestedFor, branchName)
+				.ContinueWith(continuationTask)
+				.Unwrap();
+		}
 
-        public Task<Contract.BuildResult?> GetLastBuildResult(string requestedFor, string branchName)
-        {
-            Func<Task<WebApi.Build>, Task<Contract.BuildResult?>> continuationTask = async (t) => (Contract.BuildResult?)((await t).Result);
+		public Task<Contract.BuildResult?> GetLastBuildResult(string requestedFor, string branchName)
+		{
+			Func<Task<WebApi.Build>, Task<Contract.BuildResult?>> continuationTask = async (t) => (Contract.BuildResult?)((await t).Result);
 
-            return GetLastBuild(requestedFor, branchName)
-                .ContinueWith(continuationTask)
-                .Unwrap();
-        }
+			return GetLastBuild(requestedFor, branchName)
+				.ContinueWith(continuationTask)
+				.Unwrap();
+		}
 
-        private static IEnumerable<Contract.Build> _getPendingBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
-        {
-            builds = builds.Where(build =>
-               build.Status.HasValue
-               && (build.Status.Value & (Contract.BuildStatus.InProgress | Contract.BuildStatus.Cancelling | Contract.BuildStatus.Postponed | Contract.BuildStatus.NotStarted)) != Contract.BuildStatus.None
-            );
+		private static IEnumerable<Contract.Build> _getPendingBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
+		{
+			builds = builds.Where(build =>
+			   build.Status.HasValue
+			   && (build.Status.Value & (Contract.BuildStatus.InProgress | Contract.BuildStatus.Cancelling | Contract.BuildStatus.Postponed | Contract.BuildStatus.NotStarted)) != Contract.BuildStatus.None
+			);
 
-            return _getBuilds(builds, requestedFor, branchName);
-        }
+			return _getBuilds(builds, requestedFor, branchName);
+		}
 
-        private static IEnumerable<Contract.Build> _getBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
-        {
-            if (!string.IsNullOrEmpty(requestedFor))
-            {
-                builds = builds.Where(o => o.Status.HasValue && o.RequestedFor == requestedFor);
-            }
+		private static IEnumerable<Contract.Build> _getBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
+		{
+			if (!string.IsNullOrEmpty(requestedFor))
+			{
+				builds = builds.Where(o => o.Status.HasValue && o.RequestedFor == requestedFor);
+			}
 
-            if (!string.IsNullOrEmpty(requestedFor))
-            {
-                builds = builds.Where(o => o.Status.HasValue && o.SourceBranch == branchName);
-            }
+			if (!string.IsNullOrEmpty(requestedFor))
+			{
+				builds = builds.Where(o => o.Status.HasValue && o.SourceBranch == branchName);
+			}
 
-            return builds;
-        }
+			return builds;
+		}
 
-        public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
-        {
-            await Initialize(requestedFor, branchName);
+		public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
+		{
+			await Initialize(requestedFor, branchName);
 
-            return _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
-        }
+			return _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
+		}
 
-        public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor, string branchName)
-        {
-            await Initialize(requestedFor, branchName);
+		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor, string branchName)
+		{
+			await Initialize(requestedFor, branchName);
 
-            return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
-        }
+			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
+		}
 
-        public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string branchName)
-        {
-            await Initialize(branchName);
+		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string branchName)
+		{
+			await Initialize(branchName);
 
-            return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), branchName);
-        }
+			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), branchName);
+		}
 
-        public async Task<IEnumerable<Contract.Build>> GetPendingBuilds()
-        {
-            await Initialize();
+		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds()
+		{
+			await Initialize();
 
-            return _getPendingBuilds(_queriedBuilds.Select(o => o.Value));
-        }
+			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value));
+		}
 
-        public async Task<Contract.Build> GetBuild(int buildId)
-        {
-            using (var client = await _getBuildHttpClient())
-            {
-                var build = await client.GetBuildAsync(_projectName, buildId);
+		public async Task<Contract.Build> GetBuild(int buildId)
+		{
+			using (var client = await _getBuildHttpClient())
+			{
+				var build = await client.GetBuildAsync(_projectName, buildId);
 
-                _updateBuildCache(build);
+				_updateBuildCache(build);
 
-                return Mapper.Map<Contract.Build>(build);
-            }
-        }
+				return Mapper.Map<Contract.Build>(build);
+			}
+		}
 
-        public event BuildChangedEventHandler BuildChanged;
+		public event BuildChangedEventHandler BuildChanged;
 
-        private void OnBuildChanged(BuildChangedEventArgs e)
-        {
-            var handler = BuildChanged;
+		private void OnBuildChanged(BuildChangedEventArgs e)
+		{
+			var handler = BuildChanged;
 
-            handler?.Invoke(this, e);
-        }
-    }
+			handler?.Invoke(this, e);
+		}
+	}
 }

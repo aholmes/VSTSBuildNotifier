@@ -99,39 +99,39 @@ namespace VSTS.Contract
 		[DataMember(EmitDefaultValue = false)]
 		public string RequestedFor { get; set; }
 
-        public override bool Equals(object obj)
-        {
-            return obj is Build && this == (Build)obj;
-        }
-        public override int GetHashCode()
-        {
-            return (BuildNumber        == null ? 0 : BuildNumber.GetHashCode())
-                ^ (BuildNumberRevision == null ? 0 : BuildNumberRevision.GetHashCode())
-                ^ (Deleted.GetHashCode())
-                ^ (FinishTime          == null ? 0 : FinishTime.GetHashCode())
-                ^ (Id.GetHashCode())
-                ^ (KeepForever         == null ? 0 : KeepForever.GetHashCode())
-                ^ (Parameters          == null ? 0 : Parameters.GetHashCode())
-                ^ (Quality             == null ? 0 : Quality.GetHashCode())
-                ^ (QueuePosition       == null ? 0 : QueuePosition.GetHashCode())
-                ^ (QueueTime           == null ? 0 : QueueTime.GetHashCode())
-                ^ (Result              == null ? 0 : Result.GetHashCode())
-                ^ (SourceBranch        == null ? 0 : SourceBranch.GetHashCode())
-                ^ (SourceVersion       == null ? 0 : SourceVersion.GetHashCode())
-                ^ (StartTime           == null ? 0 : StartTime.GetHashCode())
-                ^ (Status              == null ? 0 : Status.GetHashCode())
-                ^ (Tags                == null ? 0 : Tags.GetHashCode())
-                ^ (Uri                 == null ? 0 : Uri.GetHashCode())
-                ^ (Url                 == null ? 0 : Url.GetHashCode())
-                ^ (RequestedFor        == null ? 0 : RequestedFor.GetHashCode());
-        }
-        public static bool operator ==(Build x, Build y)
-        {
-            return x.GetHashCode() == y.GetHashCode();
-        }
-        public static bool operator !=(Build x, Build y)
-        {
-            return !(x == y);
-        }
-    }
+		public override bool Equals(object obj)
+		{
+			return obj is Build && this == (Build)obj;
+		}
+		public override int GetHashCode()
+		{
+			return (BuildNumber        == null ? 0 : BuildNumber.GetHashCode())
+				^ (BuildNumberRevision == null ? 0 : BuildNumberRevision.GetHashCode())
+				^ (Deleted.GetHashCode())
+				^ (FinishTime          == null ? 0 : FinishTime.GetHashCode())
+				^ (Id.GetHashCode())
+				^ (KeepForever         == null ? 0 : KeepForever.GetHashCode())
+				^ (Parameters          == null ? 0 : Parameters.GetHashCode())
+				^ (Quality             == null ? 0 : Quality.GetHashCode())
+				^ (QueuePosition       == null ? 0 : QueuePosition.GetHashCode())
+				^ (QueueTime           == null ? 0 : QueueTime.GetHashCode())
+				^ (Result              == null ? 0 : Result.GetHashCode())
+				^ (SourceBranch        == null ? 0 : SourceBranch.GetHashCode())
+				^ (SourceVersion       == null ? 0 : SourceVersion.GetHashCode())
+				^ (StartTime           == null ? 0 : StartTime.GetHashCode())
+				^ (Status              == null ? 0 : Status.GetHashCode())
+				^ (Tags                == null ? 0 : Tags.GetHashCode())
+				^ (Uri                 == null ? 0 : Uri.GetHashCode())
+				^ (Url                 == null ? 0 : Url.GetHashCode())
+				^ (RequestedFor        == null ? 0 : RequestedFor.GetHashCode());
+		}
+		public static bool operator ==(Build x, Build y)
+		{
+			return x.GetHashCode() == y.GetHashCode();
+		}
+		public static bool operator !=(Build x, Build y)
+		{
+			return !(x == y);
+		}
+	}
 }

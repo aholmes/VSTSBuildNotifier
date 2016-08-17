@@ -14,86 +14,85 @@ namespace Notifier
 	{
 		static void Main(string[] args)
 		{
-            _config                       = System.Configuration.ConfigurationManager.AppSettings;
-            _VSTSUri                      = _config["VSTSUri"];
-            _VSTSCollection               = _config["VSTSCollection"];
-            _VSTSProject                  = _config["VSTSProject"];
-            _VSTSBranchName               = _config["VSTSBranchName"];
-            _VSTSBuildRequestedByUserName = _config["VSTSBuildRequestedByUserName"];
-            _twilioAccountSid             = _config["TwilioAccountSid"];
-            _twilioAuthToken              = _config["TwilioAuthToken"];
-            _twilioFromNumber             = _config["TwilioFromNumber"];
-            _twilioToNumber               = _config["TwilioToNumber"];
+			_config                       = System.Configuration.ConfigurationManager.AppSettings;
+			_VSTSUri                      = _config["VSTSUri"];
+			_VSTSCollection               = _config["VSTSCollection"];
+			_VSTSProject                  = _config["VSTSProject"];
+			_VSTSBranchName               = _config["VSTSBranchName"];
+			_VSTSBuildRequestedByUserName = _config["VSTSBuildRequestedByUserName"];
+			_twilioAccountSid             = _config["TwilioAccountSid"];
+			_twilioAuthToken              = _config["TwilioAuthToken"];
+			_twilioFromNumber             = _config["TwilioFromNumber"];
+			_twilioToNumber               = _config["TwilioToNumber"];
 
 			Console.WriteLine("Starting build monitor.");
 
 			Task.WaitAll(new[] { Exec() });
 		}
 
-        private static NameValueCollection _config;
+		private static NameValueCollection _config;
 		private static string _VSTSUri;
 		private static string _VSTSCollection;
 		private static string _VSTSProject;
-        private static string _VSTSBranchName;
-        private static string _VSTSBuildRequestedByUserName;
-        private static string _twilioAccountSid;
-        private static string _twilioAuthToken;
-        private static string _twilioFromNumber;
-        private static string _twilioToNumber;
+		private static string _VSTSBranchName;
+		private static string _VSTSBuildRequestedByUserName;
+		private static string _twilioAccountSid;
+		private static string _twilioAuthToken;
+		private static string _twilioFromNumber;
+		private static string _twilioToNumber;
 
 
 		static async Task Exec()
 		{
-            var buildService = new VSTS.Build(_VSTSUri, _VSTSCollection, _VSTSProject);
-            buildService.BuildChanged += (sender, args) =>
-            {
-                Console.WriteLine("Done - old: " + args.OldBuild.Id + ": " + args.OldBuild.Status + " " + args.OldBuild.Result);
-                Console.WriteLine("Done - new: " + args.NewBuild.Id + ": " + args.NewBuild.Status + " " + args.NewBuild.Result);
+			var buildService = new VSTS.Build(_VSTSUri, _VSTSCollection, _VSTSProject);
+			buildService.BuildChanged += (sender, args) =>
+			{
+				Console.WriteLine("Done - old: " + args.OldBuild.Id + ": " + args.OldBuild.Status + " " + args.OldBuild.Result);
+				Console.WriteLine("Done - new: " + args.NewBuild.Id + ": " + args.NewBuild.Status + " " + args.NewBuild.Result);
 
-                var message = args.NewBuild.Status == BuildStatus.InProgress
-                    ? string.Format("Build ID {0} started at {1}", args.NewBuild.Id, DateTime.UtcNow)
-                    : string.Format("Build ID {0} finished at {1} with status \"{2}\" and result \"{3}\"", args.NewBuild.Id, DateTime.UtcNow, args.NewBuild.Status, args.NewBuild.Result);
+				var message = args.NewBuild.Status == BuildStatus.InProgress
+					? string.Format("Build ID {0} started at {1}", args.NewBuild.Id, DateTime.UtcNow)
+					: string.Format("Build ID {0} finished at {1} with status \"{2}\" and result \"{3}\"", args.NewBuild.Id, DateTime.UtcNow, args.NewBuild.Status, args.NewBuild.Result);
 
-                SendTwilioMessage(message);
-            };
+				SendTwilioMessage(message);
+			};
 
-            System.Func<Task<IEnumerable<Build>>> getBuilds;
-            if (!string.IsNullOrEmpty(_VSTSBuildRequestedByUserName))
-            {
-                getBuilds = () => buildService.GetBuilds(requestedFor: _VSTSBuildRequestedByUserName);
-            }
-            else if (!string.IsNullOrEmpty(_VSTSBranchName))
-            {
-                getBuilds = () => buildService.GetBuilds(branchName: _VSTSBranchName);
-            }
-            else
-            {
-                getBuilds = () => buildService.GetBuilds();
-            }
+			System.Func<Task<IEnumerable<Build>>> getBuilds;
+			if (!string.IsNullOrEmpty(_VSTSBuildRequestedByUserName))
+			{
+				getBuilds = () => buildService.GetBuilds(requestedFor: _VSTSBuildRequestedByUserName);
+			}
+			else if (!string.IsNullOrEmpty(_VSTSBranchName))
+			{
+				getBuilds = () => buildService.GetBuilds(branchName: _VSTSBranchName);
+			}
+			else
+			{
+				getBuilds = () => buildService.GetBuilds();
+			}
 
-			//var last = build.GetPendingBuildIds("aholmes", "DevNextRelease").Result;
 			Console.WriteLine("Running ...");
-            while (true)
-            {
-                Console.WriteLine("\n" + DateTime.Now);
+			while (true)
+			{
+				Console.WriteLine("\n" + DateTime.Now);
 
-                var builds = await getBuilds();
+				var builds = await getBuilds();
 
-                var pendingBuilds = builds.Where(build => (build.Status.Value & (BuildStatus.InProgress | BuildStatus.Cancelling | BuildStatus.Postponed | BuildStatus.NotStarted)) != BuildStatus.None);
-                foreach(var build in pendingBuilds)
-                {
-                    Console.WriteLine("Monitoring: " + build.Id + ": " + build.Status + " " + build.Result);
-                }
+				var pendingBuilds = builds.Where(build => (build.Status.Value & (BuildStatus.InProgress | BuildStatus.Cancelling | BuildStatus.Postponed | BuildStatus.NotStarted)) != BuildStatus.None);
+				foreach (var build in pendingBuilds)
+				{
+					Console.WriteLine("Monitoring: " + build.Id + ": " + build.Status + " " + build.Result);
+				}
 
-                await Task.Delay(3000);
-            }
+				await Task.Delay(3000);
+			}
 		}
 
-        static Task SendTwilioMessage(string message)
-        {
+		static Task SendTwilioMessage(string message)
+		{
 			var twilio = new Twilio.Sender(_twilioAccountSid, _twilioAuthToken);
 
 			return Task.FromResult(twilio.Send(_twilioFromNumber, _twilioToNumber, message));
-        }
+		}
 	}
 }

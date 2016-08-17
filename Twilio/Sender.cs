@@ -8,7 +8,7 @@
 		public Sender(string accountSid, string authToken)
 		{
 			AccountSid = accountSid;
-			AuthToken = authToken;
+			AuthToken  = authToken;
 		}
 
 		public string Send(string fromNumber, string toNumber, string messageBody)
