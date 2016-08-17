@@ -36,19 +36,9 @@ namespace VSTS
         /// <param name="requestedFor"></param>
         /// <param name="branchName"></param>
         /// <returns></returns>
-        public Task Initialize(string requestedFor, string branchName)
+        public Task Initialize(string requestedFor = default(string), string branchName = default(string))
         {
             return _getBuildsFromServer(requestedFor, branchName, 100);
-        }
-
-        public Task Initialize(string branchName)
-        {
-            return _getBuildsFromServer(branchName: branchName, top: 100);
-        }
-
-        public Task Initialize()
-        {
-            return _getBuildsFromServer(top: 100);
         }
 
         private async Task<List<WebApi.Build>> _getBuildsFromServer(string requestedFor = default(string), string branchName = default(string), int? top = default(int?))
@@ -133,76 +123,50 @@ namespace VSTS
                 .Unwrap();
         }
 
-        private static IEnumerable<Contract.Build> _getPendingBuilds(string requestedFor, string branchName, IEnumerable<Contract.Build> builds)
+        private static IEnumerable<Contract.Build> _getPendingBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
         {
-            return builds.Where(build =>
+            builds = builds.Where(build =>
                build.Status.HasValue
                && (build.Status.Value & (Contract.BuildStatus.InProgress | Contract.BuildStatus.Cancelling | Contract.BuildStatus.Postponed | Contract.BuildStatus.NotStarted)) != Contract.BuildStatus.None
-               && (string.IsNullOrEmpty(requestedFor) || build.RequestedFor == requestedFor)
-               && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
-           );
-        }
-
-        private static IEnumerable<Contract.Build> _getPendingBuilds(string branchName, IEnumerable<Contract.Build> builds)
-        {
-            return builds.Where(build =>
-               build.Status.HasValue
-               && (build.Status.Value & (Contract.BuildStatus.InProgress | Contract.BuildStatus.Cancelling | Contract.BuildStatus.Postponed | Contract.BuildStatus.NotStarted)) != Contract.BuildStatus.None
-               && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
-           );
-        }
-
-        private static IEnumerable<Contract.Build> _getPendingBuilds(IEnumerable<Contract.Build> builds)
-        {
-            return builds.Where(build =>
-               build.Status.HasValue
-               && (build.Status.Value & (Contract.BuildStatus.InProgress | Contract.BuildStatus.Cancelling | Contract.BuildStatus.Postponed | Contract.BuildStatus.NotStarted)) != Contract.BuildStatus.None
-           );
-        }
-
-        private static IEnumerable<Contract.Build> _getBuilds(string requestedFor, string branchName, IEnumerable<Contract.Build> builds)
-        {
-            return builds.Where(build =>
-               build.Status.HasValue
-               && (string.IsNullOrEmpty(requestedFor) || build.RequestedFor == requestedFor)
-               && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
             );
+
+            return _getBuilds(builds, requestedFor, branchName);
         }
 
-        private static IEnumerable<Contract.Build> _getBuilds(string branchName, IEnumerable<Contract.Build> builds)
+        private static IEnumerable<Contract.Build> _getBuilds(IEnumerable<Contract.Build> builds, string requestedFor = default(string), string branchName = default(string))
         {
-            return builds.Where(build =>
-               build.Status.HasValue
-               && (string.IsNullOrEmpty(branchName) || build.SourceBranch == branchName)
-            );
+            if (!string.IsNullOrEmpty(requestedFor))
+            {
+                builds = builds.Where(o => o.Status.HasValue && o.RequestedFor == requestedFor);
+            }
+
+            if (!string.IsNullOrEmpty(requestedFor))
+            {
+                builds = builds.Where(o => o.Status.HasValue && o.SourceBranch == branchName);
+            }
+
+            return builds;
         }
 
-        public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor, string branchName)
+        public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
         {
             await Initialize(requestedFor, branchName);
 
-            return _getBuilds(requestedFor, branchName, _queriedBuilds.Select(o => o.Value));
-        }
-
-        public async Task<IEnumerable<Contract.Build>> GetBuilds(string branchName)
-        {
-            await Initialize(branchName);
-
-            return _getBuilds(branchName, _queriedBuilds.Select(o => o.Value));
+            return _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
         }
 
         public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor, string branchName)
         {
             await Initialize(requestedFor, branchName);
 
-            return _getPendingBuilds(requestedFor, branchName, _queriedBuilds.Select(o => o.Value));
+            return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
         }
 
         public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string branchName)
         {
             await Initialize(branchName);
 
-            return _getPendingBuilds(branchName, _queriedBuilds.Select(o => o.Value));
+            return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), branchName);
         }
 
         public async Task<IEnumerable<Contract.Build>> GetPendingBuilds()
