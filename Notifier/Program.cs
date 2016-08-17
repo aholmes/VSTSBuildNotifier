@@ -50,7 +50,11 @@ namespace Notifier
                     Console.WriteLine("Done - old: " + args.OldBuild.Id + ": " + args.OldBuild.Status + " " + args.OldBuild.Result);
                     Console.WriteLine("Done - new: " + args.NewBuild.Id + ": " + args.NewBuild.Status + " " + args.NewBuild.Result);
 
-                    SendTwilioMessage(string.Format("Build ID {0} finished with status \"{1}\" and result \"{2}\"", args.NewBuild.Id, args.NewBuild.Status, args.NewBuild.Result));
+                    var message = args.NewBuild.Status == BuildStatus.InProgress
+                        ? string.Format("Build ID {0} started at {1}", args.NewBuild.Id, DateTime.UtcNow)
+                        : string.Format("Build ID {0} finished at {1} with status \"{2}\" and result \"{3}\"", args.NewBuild.Id, DateTime.UtcNow, args.NewBuild.Status, args.NewBuild.Result);
+
+                    SendTwilioMessage(message);
                 };
 
                 while (true)
