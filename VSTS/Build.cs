@@ -152,7 +152,7 @@ namespace VSTS
 				builds = builds.Where(o => o.Status.HasValue && o.RequestedFor == requestedFor);
 			}
 
-			if (!string.IsNullOrEmpty(requestedFor))
+			if (!string.IsNullOrEmpty(branchName))
 			{
 				builds = builds.Where(o => o.Status.HasValue && o.SourceBranch == branchName);
 			}
