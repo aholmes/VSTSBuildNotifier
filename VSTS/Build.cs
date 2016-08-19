@@ -76,6 +76,23 @@ namespace VSTS
 		}
 
 		/// <summary>
+		/// Query VSTS for a single build.
+		/// </summary>
+		/// <param name="buildId"></param>
+		/// <returns></returns>
+		private async Task<WebApi.Build> _getBuildFromServer(int buildId)
+		{
+			using (var client = await _getBuildHttpClient())
+			{
+				var build = await client.GetBuildAsync(_projectName, buildId);
+
+				_updateBuildCache(build);
+
+				return build;
+			}
+		}
+
+		/// <summary>
 		/// Obtain a new HTTP client to query VSTS.
 		/// </summary>
 		/// <returns></returns>
@@ -161,29 +178,27 @@ namespace VSTS
 		}
 
 		/// <summary>
-		/// Retrieve builds from VSTS, optionally filtered by `requestedFor` and `branchName`.
-		/// </summary>
-		/// <param name="requestedFor"></param>
-		/// <param name="branchName"></param>
-		/// <returns></returns>
-		public async Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
-		{
-			await Initialize(requestedFor, branchName);
-
-			return _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
-		}
-
-		/// <summary>
 		/// Retrieve pending builds from VSTS, filtered by `requestedFor` and `branchName`.
 		/// </summary>
 		/// <param name="requestedFor"></param>
 		/// <param name="branchName"></param>
 		/// <returns></returns>
-		public async Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor = default(string), string branchName = default(string))
+		public Task<IEnumerable<Contract.Build>> GetPendingBuilds(string requestedFor = default(string), string branchName = default(string))
 		{
-			await Initialize(requestedFor, branchName);
+			return Initialize(requestedFor, branchName)
+				.ContinueWith(t => _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName));
+		}
 
-			return _getPendingBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName);
+		/// <summary>
+		/// Retrieve builds from VSTS, optionally filtered by `requestedFor` and `branchName`.
+		/// </summary>
+		/// <param name="requestedFor"></param>
+		/// <param name="branchName"></param>
+		/// <returns></returns>
+		public Task<IEnumerable<Contract.Build>> GetBuilds(string requestedFor = default(string), string branchName = default(string))
+		{
+			return Initialize(requestedFor, branchName)
+				.ContinueWith(t => _getBuilds(_queriedBuilds.Select(o => o.Value), requestedFor, branchName));
 		}
 
 		/// <summary>
@@ -191,16 +206,10 @@ namespace VSTS
 		/// </summary>
 		/// <param name="buildId"></param>
 		/// <returns></returns>
-		public async Task<Contract.Build> GetBuild(int buildId)
+		public Task<Contract.Build> GetBuild(int buildId)
 		{
-			using (var client = await _getBuildHttpClient())
-			{
-				var build = await client.GetBuildAsync(_projectName, buildId);
-
-				_updateBuildCache(build);
-
-				return Mapper.Map<Contract.Build>(build);
-			}
+			return _getBuildFromServer(buildId)
+				.ContinueWith(t => Mapper.Map<Contract.Build>(t.Result));
 		}
 
 		/// <summary>
