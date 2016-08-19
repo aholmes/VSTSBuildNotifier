@@ -49,12 +49,12 @@ namespace Notifier
 			// When a build is changed, show the old and new status and result, then send a text message.
 			buildService.BuildChanged += (sender, args) =>
 			{
-				Console.WriteLine("Done - old: " + args.OldBuild.Id + ": " + args.OldBuild.Status + " " + args.OldBuild.Result);
-				Console.WriteLine("Done - new: " + args.NewBuild.Id + ": " + args.NewBuild.Status + " " + args.NewBuild.Result);
+				Console.WriteLine("Done - old: {0} ({1}): {2} {3}", args.OldBuild.Id, args.OldBuild.RequestedFor, args.OldBuild.Status, args.OldBuild.Result);
+				Console.WriteLine("Done - new: {0} ({1}): {2} {3}", args.NewBuild.Id, args.NewBuild.RequestedFor, args.NewBuild.Status, args.NewBuild.Result);
 
 				var message = args.NewBuild.Status == BuildStatus.InProgress
-					? string.Format("Build ID {0} started at {1}", args.NewBuild.Id, DateTime.UtcNow)
-					: string.Format("Build ID {0} finished at {1} with status \"{2}\" and result \"{3}\"", args.NewBuild.Id, DateTime.UtcNow, args.NewBuild.Status, args.NewBuild.Result);
+					? string.Format("Build ID {0} ({1}) started at {2}", args.NewBuild.Id, args.NewBuild.RequestedFor, DateTime.UtcNow)
+					: string.Format("Build ID {0} ({1}) finished at {2} with status \"{3}\" and result \"{4}\"", args.NewBuild.Id, args.NewBuild.RequestedFor, DateTime.UtcNow, args.NewBuild.Status, args.NewBuild.Result);
 
 				SendTwilioMessage(message);
 			};
@@ -88,7 +88,7 @@ namespace Notifier
 				var pendingBuilds = builds.Where(build => (build.Status.Value & (BuildStatus.InProgress | BuildStatus.Cancelling | BuildStatus.Postponed | BuildStatus.NotStarted)) != BuildStatus.None);
 				foreach (var build in pendingBuilds)
 				{
-					Console.WriteLine("Monitoring: " + build.Id + ": " + build.Status + " " + build.Result);
+					Console.WriteLine("Monitoring: {0} ({1}): {2} {3}", build.Id, build.RequestedFor, build.Status, build.Result);
 				}
 
 				await Task.Delay(3000);
